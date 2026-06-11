@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Dados (corpus, indices, queries do Kaggle) - NUNCA versionar
+data/
+
+# Arquivos de submissao gerados (mantemos no Git apenas os CSVs finais entregues)
+submissions/*/run.log
+submissions/*/*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# NLTK
+nltk_data/
