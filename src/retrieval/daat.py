@@ -26,6 +26,9 @@ from src.index_store.inverted_index import InvertedIndex
 from src.index_store.posting import Posting
 from src.index_store.term_lexicon import TermLexicon
 
+import heapq
+
+
 
 @dataclass
 class DAATResult:
@@ -225,4 +228,114 @@ class ConjunctiveDAAT:
             postings_scanned=total_scanned,
             postings_in_lists=total_postings_in_lists,
             early_terminated=False,
+        )
+
+
+###############################################################################
+# DisjunctiveDAAT - matching disjuntivo (OR) para o Research Challenge
+#
+# Em contraste com ConjunctiveDAAT (que requer que todos os termos casem),
+# DisjunctiveDAAT coleta como candidato qualquer documento que case com
+# PELO MENOS UM dos termos da consulta. Termos ausentes do lexicon sao
+# silenciosamente pulados.
+#
+# Necessario para recuperacao top-K disjuntiva (Kaggle pede top-100, que
+# raramente seria preenchido com matching conjuntivo AND strict).
+#
+# Implementacao com min-heap sobre cursors:
+#   - Mantem heap (doc_id, cursor_idx) com a posicao corrente de cada cursor
+#   - A cada iteracao, extrai o menor doc_id; se varios cursors casarem o
+#     mesmo doc_id, todos contribuem com sua posting; cursor avanca e
+#     eh reinserido na heap se ainda tiver postings
+#   - Itera ate todos os cursors se esgotarem
+#
+# Complexidade: O(sum(df_t) * log(n_terms)) - mais caro que conjunctive
+# mas necessario.
+#
+# Interface compativel com ConjunctiveDAAT (reusa DAATResult e _Cursor).
+###############################################################################
+class DisjunctiveDAAT:
+    """
+    Matching disjuntivo (OR) com DAAT.
+ 
+    Coleta qualquer documento que case com pelo menos um termo da consulta.
+    Termos nao presentes no lexicon sao silenciosamente pulados (em vez de
+    fazer curto-circuito como no ConjunctiveDAAT).
+    """
+ 
+    def __init__(self, lexicon: TermLexicon, inverted_index: InvertedIndex):
+        self.lexicon = lexicon
+        self.ii = inverted_index
+ 
+    def intersect(self, terms: list[str]) -> DAATResult:
+        """
+        Coleta candidatos disjuntivamente.
+ 
+        Apesar do nome 'intersect' (mantido por compatibilidade com a
+        interface do ConjunctiveDAAT), aqui a semantica eh UNION:
+        retorna todos os doc_ids que casam ao menos um termo.
+        """
+        # 1. Resolve termos no lexicon, ignorando os ausentes
+        cursors: list[_Cursor] = []
+        postings_in_lists = 0
+        for term in terms:
+            entry = self.lexicon.get(term)
+            if entry is None:
+                continue  # termo desconhecido: pula silenciosamente
+            offset, df = entry
+            postings = self.ii.read_postings(offset, df)
+            if not postings:
+                continue
+            cursors.append(_Cursor(term=term, postings=postings))
+            postings_in_lists += df
+ 
+        # Nenhum termo tem postings -> resultado vazio
+        if not cursors:
+            return DAATResult(
+                matched_doc_ids=[],
+                matched_postings={},
+                postings_scanned=0,
+                postings_in_lists=0,
+            )
+ 
+        # 2. Inicializa min-heap com (doc_id_atual, cursor_idx)
+        # cursor_idx eh tie-breaker para evitar comparacao de _Cursor
+        heap: list[tuple[int, int]] = []
+        for idx, cursor in enumerate(cursors):
+            heap.append((cursor.current_doc_id(), idx))
+        heapq.heapify(heap)
+ 
+        # 3. Loop principal: itera doc_ids em ordem crescente, acumulando
+        # contribuicao de cada cursor que aponta para o mesmo doc_id
+        matched_doc_ids: list[int] = []
+        matched_postings: dict[int, dict[str, Posting]] = {}
+        postings_scanned = 0
+ 
+        while heap:
+            current_doc_id = heap[0][0]
+            current_doc_postings: dict[str, Posting] = {}
+ 
+            # Extrai todos os cursors que apontam para o MESMO doc_id atual
+            while heap and heap[0][0] == current_doc_id:
+                _, cursor_idx = heapq.heappop(heap)
+                cursor = cursors[cursor_idx]
+ 
+                # Adiciona contribuicao desse termo ao doc atual
+                current_doc_postings[cursor.term] = cursor.current_posting()
+                postings_scanned += 1
+ 
+                # Avanca cursor; se ainda tem postings, reinsere na heap
+                cursor.advance()
+                if cursor.has_next():
+                    heapq.heappush(heap, (cursor.current_doc_id(), cursor_idx))
+ 
+            # Registra o doc atual com todas as contribuicoes coletadas
+            matched_doc_ids.append(current_doc_id)
+            matched_postings[current_doc_id] = current_doc_postings
+ 
+        return DAATResult(
+            matched_doc_ids=matched_doc_ids,
+            matched_postings=matched_postings,
+            postings_scanned=postings_scanned,
+            postings_in_lists=postings_in_lists,
         )
