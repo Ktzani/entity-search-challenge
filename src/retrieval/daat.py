@@ -264,8 +264,8 @@ class DisjunctiveDAAT:
     """
  
     def __init__(self, lexicon: TermLexicon, inverted_index: InvertedIndex):
-        self.lexicon = lexicon
-        self.ii = inverted_index
+        self._lexicon = lexicon
+        self._ii = inverted_index
  
     def intersect(self, terms: list[str]) -> DAATResult:
         """
@@ -279,11 +279,11 @@ class DisjunctiveDAAT:
         cursors: list[_Cursor] = []
         postings_in_lists = 0
         for term in terms:
-            entry = self.lexicon.get(term)
+            entry = self._lexicon.get_entry(term)
             if entry is None:
                 continue  # termo desconhecido: pula silenciosamente
             offset, df = entry
-            postings = self.ii.read_postings(offset, df)
+            postings = self._ii.read_postings(offset, df)
             if not postings:
                 continue
             cursors.append(_Cursor(term=term, postings=postings))
@@ -296,13 +296,14 @@ class DisjunctiveDAAT:
                 matched_postings={},
                 postings_scanned=0,
                 postings_in_lists=0,
+                early_terminated=False,
             )
  
         # 2. Inicializa min-heap com (doc_id_atual, cursor_idx)
         # cursor_idx eh tie-breaker para evitar comparacao de _Cursor
         heap: list[tuple[int, int]] = []
         for idx, cursor in enumerate(cursors):
-            heap.append((cursor.current_doc_id(), idx))
+            heap.append((cursor.current_doc_id, idx))
         heapq.heapify(heap)
  
         # 3. Loop principal: itera doc_ids em ordem crescente, acumulando
@@ -321,13 +322,13 @@ class DisjunctiveDAAT:
                 cursor = cursors[cursor_idx]
  
                 # Adiciona contribuicao desse termo ao doc atual
-                current_doc_postings[cursor.term] = cursor.current_posting()
+                current_doc_postings[cursor.term] = cursor.current_posting
                 postings_scanned += 1
  
                 # Avanca cursor; se ainda tem postings, reinsere na heap
-                cursor.advance()
-                if cursor.has_next():
-                    heapq.heappush(heap, (cursor.current_doc_id(), cursor_idx))
+                cursor.advance_one()
+                if not cursor.is_exhausted():
+                    heapq.heappush(heap, (cursor.current_doc_id, cursor_idx))
  
             # Registra o doc atual com todas as contribuicoes coletadas
             matched_doc_ids.append(current_doc_id)
@@ -338,4 +339,5 @@ class DisjunctiveDAAT:
             matched_postings=matched_postings,
             postings_scanned=postings_scanned,
             postings_in_lists=postings_in_lists,
+            early_terminated=False,
         )

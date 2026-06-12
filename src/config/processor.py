@@ -2,7 +2,7 @@
 Constantes do processador de queries.
 """
 
-TOP_K = 10
+TOP_K = 100
 
 # BM25 classico (Robertson et al.): k1 controla saturacao do TF
 # (1.2-2.0 tipicos); b controla normalizacao por tamanho do doc.
