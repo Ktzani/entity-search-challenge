@@ -42,7 +42,7 @@ def read_qrels(path: str) -> dict[str, dict[str, int]]:
             try:
                 rel = int(row[2])
             except ValueError:
-                continue  # header residual ou linha invalida
+                continue
             if rel > 0:
                 qrels[row[0].strip()][row[1].strip()] = rel
     return dict(qrels)

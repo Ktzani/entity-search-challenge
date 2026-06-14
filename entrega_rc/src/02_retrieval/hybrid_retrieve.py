@@ -170,7 +170,6 @@ def main():
     print("[hyb] carregando campos do corpus...", file=sys.stderr)
     docs = load_corpus_fields(args.corpus, all_docids)
 
-    # cache de embeddings densas dos candidatos
     print("[hyb] coletando embeddings densas dos candidatos...", file=sys.stderr)
     doc_emb = {}
     miss = 0

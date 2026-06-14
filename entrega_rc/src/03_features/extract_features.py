@@ -141,10 +141,9 @@ def main() -> None:
     searcher_rm3.set_rm3(10, 10, 0.8)
     index_reader = LuceneIndexReader(args.i_fw)
 
-    # ---- PASSE A: busca e monta candidatos por query (cache em memoria) ----
     print("[s5-v4] passe A: buscando candidatos...", file=sys.stderr)
     t_start = time.perf_counter()
-    per_query = []          # lista de dicts com tudo necessario p/ o passe B
+    per_query = []        
     all_docids: set[str] = set()
 
     for i, (qid, qtext) in enumerate(queries, start=1):
@@ -193,14 +192,12 @@ def main() -> None:
     print(f"[s5-v4] passe A concluido em {time.perf_counter()-t_start:.1f}s, "
           f"{len(all_docids)} docids unicos", file=sys.stderr)
 
-    # ---- carrega campos do corpus (um passe streaming) ----
     print("[s5-v4] carregando campos do corpus...", file=sys.stderr)
     t_corpus = time.perf_counter()
     docs = load_corpus_fields(args.corpus, all_docids)
     print(f"[s5-v4] corpus lido em {time.perf_counter()-t_corpus:.1f}s",
           file=sys.stderr)
 
-    # ---- PASSE B: computa features e escreve ----
     print("[s5-v4] passe B: computando features...", file=sys.stderr)
     rows: list[dict] = []
     for q in per_query:

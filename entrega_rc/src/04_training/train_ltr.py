@@ -75,7 +75,6 @@ def main() -> None:
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
-    # Le features
     print(f"[s5-train] carregando features...", file=sys.stderr)
     rows, feature_cols = load_features(args.input)
     print(
@@ -102,7 +101,6 @@ def main() -> None:
         file=sys.stderr,
     )
 
-    # Monta arrays para LightGBM
     def build_arrays(qid_set: set[str]):
         X: list[list[float]] = []
         y: list[int] = []
@@ -126,7 +124,6 @@ def main() -> None:
         file=sys.stderr,
     )
 
-    # Treina LambdaMART
     print(f"[s5-train] treinando LambdaMART...", file=sys.stderr)
     train_data = lgb.Dataset(X_train, label=y_train, group=g_train,
                               feature_name=feature_cols)
@@ -145,11 +142,9 @@ def main() -> None:
         ],
     )
 
-    # Salva
     model.save_model(args.output)
     print(f"[s5-train] modelo salvo em {args.output}", file=sys.stderr)
 
-    # Feature importance
     importances = model.feature_importance(importance_type="gain")
     print(f"[s5-train] feature importance (gain):", file=sys.stderr)
     for fc, imp in sorted(zip(feature_cols, importances), key=lambda x: -x[1]):
