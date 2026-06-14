@@ -19,6 +19,15 @@ data/
 submissions/*/run.log
 submissions/*/*.tmp
 
+# Artefatos PESADOS / regeneraveis em submissions (bloqueiam o push >100MB) -
+# mantemos os submission_ltr_*.csv e o codigo; ignoramos indices/caches/features
+*.faiss
+*.npy
+*.npz
+submissions/*/corpus_index/
+submissions/*/dense*/
+submissions/*/features/
+
 # IDE
 .vscode/
 .idea/
